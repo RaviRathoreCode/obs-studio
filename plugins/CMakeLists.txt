@@ -31,6 +31,8 @@ macro(check_obs_websocket)
 endmacro()
 
 # Add plugins in alphabetical order to retain order in IDE projects
+
+add_obs_plugin(obs-license)
 add_obs_plugin(
     aja
     PLATFORMS WINDOWS MACOS LINUX
@@ -88,3 +90,4 @@ add_obs_plugin(vlc-video WITH_MESSAGE)
 add_obs_plugin(win-capture PLATFORMS WINDOWS)
 add_obs_plugin(win-dshow PLATFORMS WINDOWS)
 add_obs_plugin(win-wasapi PLATFORMS WINDOWS)
+
