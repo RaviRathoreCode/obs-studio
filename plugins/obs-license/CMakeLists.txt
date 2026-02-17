@@ -13,15 +13,12 @@ target_compile_features(obs-license PRIVATE cxx_std_17)
 
 set_target_properties(obs-license PROPERTIES
     PREFIX ""
+    SUFFIX ".dll"
     FOLDER "plugins"
 )
 
+# Correct install command
 install(TARGETS obs-license
-    LIBRARY DESTINATION obs-plugins/64bit
     RUNTIME DESTINATION obs-plugins/64bit
-)
-
-# 🔹 Install locale files
-install(DIRECTORY data/
-    DESTINATION data/obs-plugins/obs-license
+    LIBRARY DESTINATION obs-plugins/64bit
 )
