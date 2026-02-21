@@ -11,7 +11,30 @@
 OBS_DECLARE_MODULE()
 OBS_MODULE_USE_DEFAULT_LOCALE("obs-license", "en-US")
 
-#define SECRET_KEY "MY_PRIVATE_SECRET1"
+#define SECRET_KEY "MY_PRIVATE_SECRET"
+
+void force_exit_obs()
+{
+    blog(LOG_ERROR, "[obs-license] FORCING OBS TO EXIT due to invalid license");
+
+    // Show error message
+    MessageBoxA(NULL,
+                "LICENSE INVALID!\n\n"
+                "This plugin requires a valid license to run OBS.\n"
+                "The application will now close.\n\n"
+                "Please install a valid license and restart OBS.",
+                "OBS License - FATAL ERROR",
+                MB_ICONERROR | MB_OK);
+
+    // Get the main OBS window and close it
+    HWND hwnd = FindWindowA(NULL, "OBS Studio");
+    if (hwnd) {
+        PostMessageA(hwnd, WM_CLOSE, 0, 0);
+    } else {
+        // If window not found, force exit
+        exit(1);
+    }
+}
 
 std::string sha256(const std::string &data)
 {
@@ -92,7 +115,7 @@ bool verify_license()
         blog(LOG_ERROR, "[obs-license] License file not found in any location");
         showMessageBox("OBS License - ERROR",
                        "License file not found!\n\n"
-                       "Expected location: C:\\ProgramData\\OBSSample\\license.dat\n\n"
+                    //    "Expected location: C:\\ProgramData\\OBSSample\\license.dat\n\n"
                        "Please install a valid license to use this plugin.",
                        MB_ICONERROR | MB_OK);
         return false;
@@ -135,7 +158,7 @@ bool verify_license()
 
     // Show message box based on validation result
     if (isValid) {
-        std::string message = "✅ LICENSE VALID!\n\n";
+        std::string message = "LICENSE VALID!\n\n";
         message += "License File: " + foundPath + "\n";
         message += "User: " + userInfo + "\n";
         message += "Expiry: " + expiryInfo + "\n\n";
@@ -143,10 +166,10 @@ bool verify_license()
 
         showMessageBox("OBS License - SUCCESS", message, MB_ICONINFORMATION | MB_OK);
     } else {
-        std::string message = "❌ LICENSE INVALID!\n\n";
+        std::string message = "LICENSE INVALID!\n\n";
         message += "License File: " + foundPath + "\n";
-        message += "Expected hash: " + expected.substr(0, 16) + "...\n";
-        message += "Provided hash: " + line2.substr(0, 16) + "...\n\n";
+        // message += "Expected hash: " + expected.substr(0, 16) + "...\n";
+        // message += "Provided hash: " + line2.substr(0, 16) + "...\n\n";
         message += "Plugin will be disabled.\n\n";
         message += "Please contact support for a valid license.";
 
@@ -170,6 +193,8 @@ bool obs_module_load(void)
         blog(LOG_ERROR, "[obs-license] LICENSE VALIDATION FAILED!");
         blog(LOG_ERROR, "[obs-license] Plugin will be disabled");
         blog(LOG_ERROR, "[obs-license] ==========================");
+
+		force_exit_obs();
 
         return false; // Plugin won't load
     }

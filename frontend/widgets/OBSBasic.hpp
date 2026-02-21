@@ -713,7 +713,7 @@ private:
 				QIcon trayIconFile = QIcon(":/res/images/obs_macos.svg");
 				trayIconFile.setIsMask(true);
 #else
-				QIcon trayIconFile = QIcon(":/res/images/obs.png");
+				QIcon trayIconFile = QIcon(":/res/images/obs-testt.png");
 #endif
 				trayIcon->setIcon(QIcon::fromTheme("obs-tray", trayIconFile));
 			}
