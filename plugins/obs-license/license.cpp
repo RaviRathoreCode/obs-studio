@@ -4,14 +4,19 @@
 #include <string>
 #include <vector>
 #include <wincrypt.h>
-#include <filesystem>
 #include <sstream>
 #include <iomanip>
+#include <iphlpapi.h>
+#include <intrin.h>
+
+#pragma comment(lib, "crypt32.lib")
+#pragma comment(lib, "iphlpapi.lib")
+using namespace std;
 
 OBS_DECLARE_MODULE()
 OBS_MODULE_USE_DEFAULT_LOCALE("obs-license", "en-US")
 
-#define SECRET_KEY "MY_PRIVATE_SECRET"
+#define SECRET_KEY "EDUNIX_PRIVATE_SECRET_2026"
 
 void force_exit_obs()
 {
@@ -84,100 +89,211 @@ void showMessageBox(const std::string& title, const std::string& message, UINT t
     MessageBoxA(NULL, message.c_str(), title.c_str(), type);
 }
 
-bool verify_license()
-{
-    // Try multiple possible paths
-    std::vector<std::string> possiblePaths = {
-        "C:\\ProgramData\\OBSSample\\license.dat",
-        "license.dat",
-        "C:\\Users\\vikas\\AppData\\Roaming\\obs-studio\\plugins\\obs-license\\license.dat",
-        "C:\\Program Files\\obs-studio\\obs-plugins\\64bit\\license.dat"
-    };
+string getMachineId() {
+    DWORD serial = 0;
+    GetVolumeInformationA("C:\\", NULL, 0, &serial, NULL, NULL, NULL, 0);
 
-    std::string line1, line2;
-    std::string foundPath;
-    bool fileFound = false;
+    int cpuInfo[4] = { 0 };
+    __cpuid(cpuInfo, 0);
 
-    for (const auto &path : possiblePaths) {
-        std::ifstream file(path);
-        if (file.is_open()) {
-            foundPath = path;
-            blog(LOG_INFO, "[obs-license] Found license file at: %s", path.c_str());
-            std::getline(file, line1);
-            std::getline(file, line2);
-            file.close();
-            fileFound = true;
-            break;
-        }
+    IP_ADAPTER_INFO AdapterInfo[16];
+    DWORD buflen = sizeof(AdapterInfo);
+    string mac = "";
+
+    if (GetAdaptersInfo(AdapterInfo, &buflen) == NO_ERROR) {
+        PIP_ADAPTER_INFO pAdapterInfo = AdapterInfo;
+        for (UINT i = 0; i < pAdapterInfo->AddressLength; i++)
+            mac += to_string(pAdapterInfo->Address[i]);
     }
 
-    if (!fileFound) {
-        blog(LOG_ERROR, "[obs-license] License file not found in any location");
+    string raw = to_string(serial) +
+        to_string(cpuInfo[0]) +
+        to_string(cpuInfo[1]) +
+        to_string(cpuInfo[2]) +
+        to_string(cpuInfo[3]) +
+        mac;
+
+    return sha256(raw);
+}
+
+
+bool verify_license()
+{
+    const std::string licensePath = "C:\\ProgramData\\Edunix\\.license\\license.dat";
+
+    std::ifstream file(licensePath);
+    if (!file.is_open()) {
+        blog(LOG_ERROR, "[obs-license] License file not found");
         showMessageBox("OBS License - ERROR",
-                       "License file not found!\n\n"
-                    //    "Expected location: C:\\ProgramData\\OBSSample\\license.dat\n\n"
-                       "Please install a valid license to use this plugin.",
+                       "License file not found!\n\nPlease activate license first.",
                        MB_ICONERROR | MB_OK);
         return false;
     }
 
-    // Clean up line2 (remove carriage return if present)
-    if (!line2.empty() && (line2.back() == '\r' || line2.back() == '\n'))
-        line2.pop_back();
+    std::string content;
+    std::getline(file, content);
+    file.close();
 
-    std::string expected = sha256(line1 + SECRET_KEY);
+    // Find SIGN=
+    size_t pos = content.rfind("|SIGN=");
+    if (pos == std::string::npos) {
+        blog(LOG_ERROR, "[obs-license] SIGN not found in license");
+        return false;
+    }
 
-    // Log for debugging
-    blog(LOG_INFO, "[obs-license] === License Debug Info ===");
-    blog(LOG_INFO, "[obs-license] License data: %s", line1.c_str());
-    blog(LOG_INFO, "[obs-license] Expected hash: %s", expected.c_str());
-    blog(LOG_INFO, "[obs-license] Provided hash: %s", line2.c_str());
+    std::string data = content.substr(0, pos);
+    std::string storedSign = content.substr(pos + 6);
 
-    bool isValid = (expected == line2);
-    blog(LOG_INFO, "[obs-license] License valid: %s", isValid ? "YES" : "NO");
+    std::string expectedSign = sha256(data + SECRET_KEY);
 
-    // Parse user info from license data
-    std::string userInfo = "Unknown";
-    std::string expiryInfo = "Unknown";
+    blog(LOG_INFO, "[obs-license] Stored Sign: %s", storedSign.c_str());
+    blog(LOG_INFO, "[obs-license] Expected Sign: %s", expectedSign.c_str());
 
-    if (isValid) {
-        size_t userPos = line1.find("USER=");
-        size_t expPos = line1.find("EXP=");
+    if (storedSign != expectedSign) {
+        blog(LOG_ERROR, "[obs-license] Signature mismatch!");
+        return false;
+    }
 
-        if (userPos != std::string::npos) {
-            size_t endPos = line1.find('|', userPos);
-            if (endPos == std::string::npos)
-                endPos = line1.length();
-            userInfo = line1.substr(userPos + 5, endPos - (userPos + 5));
-        }
+    // Optional: verify Machine ID matches current machine
+    size_t midPos = data.find("MID=");
+    if (midPos != std::string::npos) {
+        std::string currentMachineId = getMachineId();  // You must copy this function from DLL
 
-        if (expPos != std::string::npos) {
-            expiryInfo = line1.substr(expPos + 4);
+        size_t midEnd = data.find("|", midPos);
+        std::string storedMachineId = data.substr(midPos + 4, midEnd - (midPos + 4));
+
+        if (storedMachineId != currentMachineId) {
+            blog(LOG_ERROR, "[obs-license] Machine ID mismatch!");
+            return false;
         }
     }
 
-    // Show message box based on validation result
-    if (isValid) {
-        std::string message = "LICENSE VALID!\n\n";
-        message += "License File: " + foundPath + "\n";
-        message += "User: " + userInfo + "\n";
-        message += "Expiry: " + expiryInfo + "\n\n";
-        message += "Plugin will be enabled.";
+    // Expiry check
+    size_t expPos = data.find("|EXP=");
+    if (expPos != std::string::npos) {
 
-        showMessageBox("OBS License - SUCCESS", message, MB_ICONINFORMATION | MB_OK);
-    } else {
-        std::string message = "LICENSE INVALID!\n\n";
-        message += "License File: " + foundPath + "\n";
-        // message += "Expected hash: " + expected.substr(0, 16) + "...\n";
-        // message += "Provided hash: " + line2.substr(0, 16) + "...\n\n";
-        message += "Plugin will be disabled.\n\n";
-        message += "Please contact support for a valid license.";
+        std::string expiryStr = data.substr(expPos + 5);
 
-        showMessageBox("OBS License - ERROR", message, MB_ICONERROR | MB_OK);
+        // Extract only date part (YYYY-MM-DD)
+        std::string expiryDate = expiryStr.substr(0, 10);
+
+        SYSTEMTIME st;
+        GetSystemTime(&st);
+
+        char currentDate[11];
+        sprintf_s(currentDate, "%04d-%02d-%02d",
+                st.wYear, st.wMonth, st.wDay);
+
+        blog(LOG_INFO, "[obs-license] Expiry: %s", expiryDate.c_str());
+        blog(LOG_INFO, "[obs-license] Current: %s", currentDate);
+
+        if (std::string(currentDate) > expiryDate) {
+            blog(LOG_ERROR, "[obs-license] License expired!");
+            return false;
+        }
+    }
+    else {
+        blog(LOG_ERROR, "[obs-license] EXP not found in license!");
+        return false;
     }
 
-    return isValid;
+    return true;
 }
+
+// bool verify_license()
+// {
+//     // Try multiple possible paths
+//     std::vector<std::string> possiblePaths = {
+//         "C:\\ProgramData\\OBSSample\\license.dat",
+//         "license.dat",
+//         "C:\\Users\\vikas\\AppData\\Roaming\\obs-studio\\plugins\\obs-license\\license.dat",
+//         "C:\\Program Files\\obs-studio\\obs-plugins\\64bit\\license.dat"
+//     };
+
+//     std::string line1, line2;
+//     std::string foundPath;
+//     bool fileFound = false;
+
+//     for (const auto &path : possiblePaths) {
+//         std::ifstream file(path);
+//         if (file.is_open()) {
+//             foundPath = path;
+//             blog(LOG_INFO, "[obs-license] Found license file at: %s", path.c_str());
+//             std::getline(file, line1);
+//             std::getline(file, line2);
+//             file.close();
+//             fileFound = true;
+//             break;
+//         }
+//     }
+
+//     if (!fileFound) {
+//         blog(LOG_ERROR, "[obs-license] License file not found in any location");
+//         showMessageBox("OBS License - ERROR",
+//                        "License file not found!\n\n"
+//                     //    "Expected location: C:\\ProgramData\\OBSSample\\license.dat\n\n"
+//                        "Please install a valid license to use this plugin.",
+//                        MB_ICONERROR | MB_OK);
+//         return false;
+//     }
+
+//     // Clean up line2 (remove carriage return if present)
+//     if (!line2.empty() && (line2.back() == '\r' || line2.back() == '\n'))
+//         line2.pop_back();
+
+//     std::string expected = sha256(line1 + SECRET_KEY);
+
+//     // Log for debugging
+//     blog(LOG_INFO, "[obs-license] === License Debug Info ===");
+//     blog(LOG_INFO, "[obs-license] License data: %s", line1.c_str());
+//     blog(LOG_INFO, "[obs-license] Expected hash: %s", expected.c_str());
+//     blog(LOG_INFO, "[obs-license] Provided hash: %s", line2.c_str());
+
+//     bool isValid = (expected == line2);
+//     blog(LOG_INFO, "[obs-license] License valid: %s", isValid ? "YES" : "NO");
+
+//     // Parse user info from license data
+//     std::string userInfo = "Unknown";
+//     std::string expiryInfo = "Unknown";
+
+//     if (isValid) {
+//         size_t userPos = line1.find("USER=");
+//         size_t expPos = line1.find("EXP=");
+
+//         if (userPos != std::string::npos) {
+//             size_t endPos = line1.find('|', userPos);
+//             if (endPos == std::string::npos)
+//                 endPos = line1.length();
+//             userInfo = line1.substr(userPos + 5, endPos - (userPos + 5));
+//         }
+
+//         if (expPos != std::string::npos) {
+//             expiryInfo = line1.substr(expPos + 4);
+//         }
+//     }
+
+//     // Show message box based on validation result
+//     if (isValid) {
+//         std::string message = "LICENSE VALID!\n\n";
+//         message += "License File: " + foundPath + "\n";
+//         message += "User: " + userInfo + "\n";
+//         message += "Expiry: " + expiryInfo + "\n\n";
+//         message += "Plugin will be enabled.";
+
+//         showMessageBox("OBS License - SUCCESS", message, MB_ICONINFORMATION | MB_OK);
+//     } else {
+//         std::string message = "LICENSE INVALID!\n\n";
+//         message += "License File: " + foundPath + "\n";
+//         // message += "Expected hash: " + expected.substr(0, 16) + "...\n";
+//         // message += "Provided hash: " + line2.substr(0, 16) + "...\n\n";
+//         message += "Plugin will be disabled.\n\n";
+//         message += "Please contact support for a valid license.";
+
+//         showMessageBox("OBS License - ERROR", message, MB_ICONERROR | MB_OK);
+//     }
+
+//     return isValid;
+// }
 
 bool obs_module_load(void)
 {
@@ -210,7 +326,7 @@ bool obs_module_load(void)
 void obs_module_unload(void)
 {
     blog(LOG_INFO, "[obs-license] Plugin unloaded");
-    showMessageBox("OBS License", "Plugin unloaded successfully.", MB_ICONINFORMATION | MB_OK);
+    // showMessageBox("OBS License", "Plugin unloaded successfully.", MB_ICONINFORMATION | MB_OK);
 }
 
 MODULE_EXPORT const char *obs_module_description(void)
