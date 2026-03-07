@@ -244,6 +244,10 @@ OBSBasic::OBSBasic(QWidget *parent) : OBSMainWindow(parent), undo_s(ui), ui(new 
 	api = InitializeAPIInterface(this);
 
 	ui->setupUi(this);
+
+	// CROW
+	delete ui->actionCheckForUpdates;
+	ui->actionCheckForUpdates = nullptr;
 	ui->previewDisabledWidget->setVisible(false);
 
 	/* Set up streaming connections */
@@ -442,7 +446,7 @@ OBSBasic::OBSBasic(QWidget *parent) : OBSMainWindow(parent), undo_s(ui), ui(new 
 	installEventFilter(shortcutFilter);
 
 	stringstream name;
-	name << "OBS " << App()->GetVersionString();
+	name << "VsatX " << App()->GetVersionString();
 	blog(LOG_INFO, "%s", name.str().c_str());
 	blog(LOG_INFO, "---------------------------------");
 
@@ -519,6 +523,7 @@ OBSBasic::OBSBasic(QWidget *parent) : OBSMainWindow(parent), undo_s(ui), ui(new 
 
 	SETUP_DOCK(ui->scenesDock);
 	SETUP_DOCK(ui->sourcesDock);
+	//CROW --
 	SETUP_DOCK(ui->mixerDock);
 	SETUP_DOCK(ui->transitionsDock);
 	SETUP_DOCK(controlsDock);
@@ -1183,13 +1188,15 @@ void OBSBasic::OBSInit()
 		show();
 #endif
 
+	//CROW --
 	// Set up Audio Mixer dock
+
 	AudioMixer *audioMixer = new AudioMixer(this);
 	ui->mixerDock->setWidget(audioMixer);
 	ui->mixerDock->setContextMenuPolicy(Qt::CustomContextMenu);
 
 	connect(ui->mixerDock, &QDockWidget::customContextMenuRequested, audioMixer, &AudioMixer::showMixerContextMenu);
-
+	ui->mixerDock->setVisible(false);
 	/* setup stats dock */
 	OBSBasicStats *statsDlg = new OBSBasicStats(statsDock, false);
 	statsDock->setWidget(statsDlg);
@@ -1228,7 +1235,8 @@ void OBSBasic::OBSInit()
 		if (!restoreState(dockState))
 			on_resetDocks_triggered(true);
 	}
-
+	// CROW - Force hide mixer after state restore
+	// ui->mixerDock->setVisible(false);
 	bool pre23Defaults = config_get_bool(App()->GetUserConfig(), "General", "Pre23Defaults");
 	if (pre23Defaults) {
 		bool resetDockLock23 = config_get_bool(App()->GetUserConfig(), "General", "ResetDockLock23");
@@ -1276,7 +1284,8 @@ void OBSBasic::OBSInit()
 		config_save_safe(App()->GetAppConfig(), "tmp", nullptr);
 	}
 #endif
-	TimedCheckForUpdates();
+	// CROW
+	// TimedCheckForUpdates();
 
 	emit userSettingChanged("BasicWindow", "VerticalVolumeControl");
 
@@ -2091,11 +2100,11 @@ void OBSBasic::UpdateTitleBar()
 	const char *profile = config_get_string(App()->GetUserConfig(), "Basic", "Profile");
 	const char *sceneCollection = config_get_string(App()->GetUserConfig(), "Basic", "SceneCollection");
 
-	name << "OBS ";
+	name << "VsatX ";
 	if (previewProgramMode)
-		name << "Studio ";
+		name << "Broadcast ";
 
-	name << App()->GetVersionString(false);
+	// name << App()->GetVersionString(false);
 	if (safe_mode)
 		name << " (" << Str("TitleBar.SafeMode") << ")";
 	if (App()->IsPortableMode())

@@ -28,7 +28,7 @@ OBSAbout::OBSAbout(QWidget *parent) : QDialog(parent), ui(new Ui::OBSAbout)
 
 	QString ver = obs_get_version_string();
 
-	ui->version->setText(ver + bitness);
+	ui->version->setText("VsatX 1.0" + bitness);
 
 	ui->contribute->setText(QTStr("About.Contribute"));
 

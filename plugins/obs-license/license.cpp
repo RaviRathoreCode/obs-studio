@@ -12,7 +12,7 @@
 #pragma comment(lib, "crypt32.lib")
 #pragma comment(lib, "iphlpapi.lib")
 using namespace std;
-
+//CROW
 OBS_DECLARE_MODULE()
 OBS_MODULE_USE_DEFAULT_LOCALE("obs-license", "en-US")
 
@@ -119,7 +119,7 @@ string getMachineId() {
 
 bool verify_license()
 {
-    const std::string licensePath = "C:\\ProgramData\\Edunix\\.license\\license.dat";
+    const std::string licensePath = "C:\\ProgramData\\Edumix\\.license\\license.dat";
 
     std::ifstream file(licensePath);
     if (!file.is_open()) {

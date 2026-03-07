@@ -599,49 +599,65 @@ void AutoConfigStreamPage::UpdateKeyLink()
 	obs_properties_destroy(props);
 }
 
-void AutoConfigStreamPage::LoadServices(bool showAll)
+//CROW
+// void AutoConfigStreamPage::LoadServices(bool showAll)
+// {
+// 	obs_properties_t *props = obs_get_service_properties("rtmp_common");
+
+// 	OBSDataAutoRelease settings = obs_data_create();
+
+// 	obs_data_set_bool(settings, "show_all", showAll);
+
+// 	obs_property_t *prop = obs_properties_get(props, "show_all");
+// 	obs_property_modified(prop, settings);
+
+// 	ui->service->blockSignals(true);
+// 	ui->service->clear();
+
+// 	QStringList names;
+
+// 	obs_property_t *services = obs_properties_get(props, "service");
+// 	size_t services_count = obs_property_list_item_count(services);
+// 	for (size_t i = 0; i < services_count; i++) {
+// 		const char *name = obs_property_list_item_string(services, i);
+// 		names.push_back(name);
+// 	}
+
+// 	if (showAll)
+// 		names.sort(Qt::CaseInsensitive);
+
+// 	for (QString &name : names)
+// 		ui->service->addItem(name);
+
+// 	if (!showAll) {
+// 		ui->service->addItem(QTStr("Basic.AutoConfig.StreamPage.Service.ShowAll"),
+// 				     QVariant((int)ListOpt::ShowAll));
+// 	}
+
+// 	ui->service->insertItem(0, QTStr("Basic.AutoConfig.StreamPage.Service.Custom"), QVariant((int)ListOpt::Custom));
+
+// 	if (!lastService.isEmpty()) {
+// 		int idx = ui->service->findText(lastService);
+// 		if (idx != -1)
+// 			ui->service->setCurrentIndex(idx);
+// 	}
+
+// 	obs_properties_destroy(props);
+
+// 	ui->service->blockSignals(false);
+// }
+
+void AutoConfigStreamPage::LoadServices(bool /*showAll*/)
 {
-	obs_properties_t *props = obs_get_service_properties("rtmp_common");
-
-	OBSDataAutoRelease settings = obs_data_create();
-
-	obs_data_set_bool(settings, "show_all", showAll);
-
-	obs_property_t *prop = obs_properties_get(props, "show_all");
-	obs_property_modified(prop, settings);
-
 	ui->service->blockSignals(true);
 	ui->service->clear();
 
-	QStringList names;
+	// 🔒 Only Custom Service
+	ui->service->addItem(
+		QTStr("Basic.AutoConfig.StreamPage.Service.Custom"),
+		QVariant((int)ListOpt::Custom));
 
-	obs_property_t *services = obs_properties_get(props, "service");
-	size_t services_count = obs_property_list_item_count(services);
-	for (size_t i = 0; i < services_count; i++) {
-		const char *name = obs_property_list_item_string(services, i);
-		names.push_back(name);
-	}
-
-	if (showAll)
-		names.sort(Qt::CaseInsensitive);
-
-	for (QString &name : names)
-		ui->service->addItem(name);
-
-	if (!showAll) {
-		ui->service->addItem(QTStr("Basic.AutoConfig.StreamPage.Service.ShowAll"),
-				     QVariant((int)ListOpt::ShowAll));
-	}
-
-	ui->service->insertItem(0, QTStr("Basic.AutoConfig.StreamPage.Service.Custom"), QVariant((int)ListOpt::Custom));
-
-	if (!lastService.isEmpty()) {
-		int idx = ui->service->findText(lastService);
-		if (idx != -1)
-			ui->service->setCurrentIndex(idx);
-	}
-
-	obs_properties_destroy(props);
+	ui->service->setCurrentIndex(0);
 
 	ui->service->blockSignals(false);
 }
